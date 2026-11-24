@@ -1,0 +1,76 @@
+Customers Data Audit
+----------------------------------------------------------------------------------------------------------------
+SELECT COUNT(*) AS row_count FROM customers;
+SELECT Customer_ID, COUNT(*) AS records
+FROM customers GROUP BY Customer_ID HAVING COUNT(*) > 1;
+SELECT Customer_ID, COUNT(DISTINCT CONCAT_WS('|', Customer_Name, Email, Gender, City, Registration_Date)) AS versions
+FROM customers GROUP BY Customer_ID HAVING versions > 1;
+SELECT
+ SUM(Customer_Name IS NULL OR TRIM(Customer_Name)='') AS missing_name,
+ SUM(Email IS NULL OR TRIM(Email)='' OR TRIM(Email)='-') AS missing_email,
+ SUM(Gender IS NULL OR TRIM(Gender)='') AS missing_gender,
+ SUM(City IS NULL OR TRIM(City)='') AS missing_city,
+ SUM(Registration_Date IS NULL OR TRIM(Registration_Date)='') AS missing_registration_date
+FROM customers;
+SELECT Gender, COUNT(*) AS records FROM customers GROUP BY Gender;
+SELECT City, COUNT(*) AS records FROM customers GROUP BY City ORDER BY records DESC;
+SELECT Registration_Date, COUNT(*) AS records FROM customers GROUP BY Registration_Date;
+SELECT Email FROM customers
+WHERE Email IS NOT NULL AND TRIM(Email) NOT IN ('','-')
+  AND TRIM(Email) NOT REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$';
+
+Product Table Data Audit
+----------------------------------------------------------------------------------------------------------------
+SELECT COUNT(*) AS row_count FROM products;
+SELECT Product_ID, COUNT(*) AS records
+FROM products GROUP BY Product_ID HAVING COUNT(*) > 1;
+SELECT Product_ID, COUNT(DISTINCT CONCAT_WS('|', Product_Name, Category, Unit_Cost, Supplier_ID)) AS versions
+FROM products GROUP BY Product_ID HAVING versions > 1;
+SELECT
+ SUM(Product_Name IS NULL OR TRIM(Product_Name)='') AS missing_name,
+ SUM(Category IS NULL OR TRIM(Category) IN ('','-')) AS missing_category,
+ SUM(Unit_Cost IS NULL OR TRIM(Unit_Cost) IN ('','-')) AS missing_unit_cost,
+ SUM(Supplier_ID IS NULL OR TRIM(Supplier_ID)='') AS missing_supplier
+FROM products;
+SELECT Category, COUNT(*) AS records FROM products GROUP BY Category;
+SELECT Unit_Cost, COUNT(*) AS records FROM products GROUP BY Unit_Cost;
+
+
+Sales Data Audit
+----------------------------------------------------------------------------------------------------------------
+SELECT COUNT(*) AS row_count FROM sales;
+SELECT COUNT(*) AS exact_duplicate_rows FROM (
+  SELECT Transaction_ID, Order_Date, Customer_ID, Product_ID, Quantity, Unit_Price,
+         Discount, Store_ID, Payment_Method, COUNT(*) AS n
+  FROM sales GROUP BY Transaction_ID, Order_Date, Customer_ID, Product_ID,
+       Quantity, Unit_Price, Discount, Store_ID, Payment_Method HAVING COUNT(*) > 1
+) d;
+SELECT Transaction_ID, COUNT(*) AS line_count
+FROM sales GROUP BY Transaction_ID HAVING COUNT(*) > 1 ORDER BY line_count DESC;
+SELECT
+ SUM(Order_Date IS NULL OR TRIM(Order_Date)='') AS missing_order_date,
+ SUM(Customer_ID IS NULL OR TRIM(Customer_ID)='') AS missing_customer_id,
+ SUM(Product_ID IS NULL OR TRIM(Product_ID)='') AS missing_product_id,
+ SUM(Quantity IS NULL OR TRIM(Quantity)='') AS missing_quantity,
+ SUM(Unit_Price IS NULL OR TRIM(Unit_Price)='') AS missing_unit_price,
+ SUM(Discount IS NULL OR TRIM(Discount)='') AS missing_discount,
+ SUM(Store_ID IS NULL OR TRIM(Store_ID)='') AS missing_store_id,
+ SUM(Payment_Method IS NULL OR TRIM(Payment_Method)='') AS missing_payment_method
+FROM sales;
+SELECT Quantity, COUNT(*) AS records FROM sales GROUP BY Quantity ORDER BY records DESC;
+SELECT Unit_Price, COUNT(*) AS records FROM sales GROUP BY Unit_Price ORDER BY records DESC;
+SELECT Discount, COUNT(*) AS records FROM sales GROUP BY Discount ORDER BY records DESC;
+SELECT Order_Date, COUNT(*) AS records FROM sales
+WHERE Order_Date IS NOT NULL GROUP BY Order_Date ORDER BY records DESC;
+
+
+Stores Data Audit
+----------------------------------------------------------------------------------------------------------------
+SELECT COUNT(*) AS row_count FROM stores;
+SELECT Store_ID, COUNT(*) AS records
+FROM stores GROUP BY Store_ID HAVING COUNT(*) > 1;
+SELECT Store_ID, COUNT(DISTINCT CONCAT_WS('|', Store_Name, City, Region)) AS versions
+FROM stores GROUP BY Store_ID HAVING versions > 1;
+SELECT Region, COUNT(*) AS records FROM stores GROUP BY Region;
+SELECT Store_ID, Store_Name, City, Region FROM stores ORDER BY Store_ID;
+
