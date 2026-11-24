@@ -1,0 +1,188 @@
+Sales table cleanıng process
+-----------------------------------------------------------------------------------------------------------
+CREATE TABLE customers_clean AS
+WITH normalized AS (
+  SELECT
+    NULLIF(UPPER(TRIM(Customer_ID)), '') AS Customer_ID,
+    NULLIF(TRIM(Customer_Name), '') AS Customer_Name,
+    CASE WHEN TRIM(COALESCE(Email,'')) IN ('','-','N/A','NULL','Unknown')
+         THEN NULL ELSE LOWER(TRIM(Email)) END AS Email,
+    CASE
+      WHEN UPPER(TRIM(Gender)) IN ('F','FEMALE') THEN 'Female'
+      WHEN UPPER(TRIM(Gender)) IN ('M','MALE') THEN 'Male'
+      WHEN UPPER(TRIM(Gender)) = 'OTHER' THEN 'Other'
+      WHEN UPPER(TRIM(Gender)) = 'UNKNOWN' THEN 'Unknown'
+      ELSE NULL END AS Gender,
+    CASE
+      WHEN LOWER(TRIM(City)) IN ('istnabul','istanbul') THEN 'Istanbul'
+      WHEN LOWER(TRIM(City)) = 'bursa' THEN 'Bursa'
+      WHEN LOWER(TRIM(City)) = 'ankara' THEN 'Ankara'
+      WHEN LOWER(TRIM(City)) = 'izmir' THEN 'Izmir'
+      WHEN LOWER(TRIM(City)) = 'eskisehir' THEN 'Eskisehir'
+      WHEN LOWER(TRIM(City)) = 'konya' THEN 'Konya'
+      WHEN LOWER(TRIM(City)) = 'antalya' THEN 'Antalya'
+      WHEN LOWER(TRIM(City)) = 'adana' THEN 'Adana'
+      WHEN LOWER(TRIM(City)) = 'trabzon' THEN 'Trabzon'
+      WHEN LOWER(TRIM(City)) = 'gaziantep' THEN 'Gaziantep'
+      ELSE NULLIF(CONCAT(UPPER(LEFT(TRIM(City),1)), LOWER(SUBSTRING(TRIM(City),2))), '') END AS City,
+    Registration_Date
+  FROM customers
+),
+dedup AS (
+  SELECT *, ROW_NUMBER() OVER (
+    PARTITION BY Customer_ID
+    ORDER BY Registration_Date IS NULL, Registration_Date,
+             Customer_Name, Email, City
+  ) AS rn
+  FROM normalized WHERE Customer_ID IS NOT NULL
+)
+SELECT Customer_ID, Customer_Name, Email, Gender, City,
+       CASE WHEN Registration_Date = '1900-01-01' THEN NULL ELSE Registration_Date END AS Registration_Date
+FROM dedup WHERE rn = 1;
+
+stores data cleanıng process
+-----------------------------------------------------------------------------------------------------------
+CREATE TABLE stores_clean AS
+WITH normalized AS (
+ SELECT
+   CASE
+     WHEN UPPER(REPLACE(REPLACE(TRIM(Store_ID),'-',''),' ','')) REGEXP '^ST[0-9]{1,2}$'
+       THEN CONCAT('ST', LPAD(SUBSTRING(UPPER(REPLACE(REPLACE(TRIM(Store_ID),'-',''),' ','')),3),2,'0'))
+     WHEN UPPER(REPLACE(REPLACE(TRIM(Store_ID),'-',''),' ','')) REGEXP '^STORE[0-9]{1,2}$'
+       THEN CONCAT('ST', LPAD(SUBSTRING(UPPER(REPLACE(REPLACE(TRIM(Store_ID),'-',''),' ','')),6),2,'0'))
+     ELSE NULLIF(UPPER(TRIM(Store_ID)),'') END AS Store_ID,
+   NULLIF(TRIM(Store_Name),'') AS Store_Name,
+   CASE WHEN LOWER(TRIM(City))='istanbul' THEN 'Istanbul'
+        WHEN LOWER(TRIM(City))='ankara' THEN 'Ankara'
+        WHEN LOWER(TRIM(City))='izmir' THEN 'Izmir'
+        WHEN LOWER(TRIM(City))='adana' THEN 'Adana'
+        WHEN LOWER(TRIM(City))='eskisehir' THEN 'Eskisehir'
+        WHEN LOWER(TRIM(City))='antalya' THEN 'Antalya'
+        WHEN LOWER(TRIM(City))='bursa' THEN 'Bursa'
+        WHEN LOWER(TRIM(City))='konya' THEN 'Konya'
+        WHEN LOWER(TRIM(City))='trabzon' THEN 'Trabzon'
+        ELSE NULLIF(TRIM(City),'') END AS City,
+   CASE
+     WHEN LOWER(TRIM(Region)) IN ('aegean') THEN 'Aegean'
+     WHEN LOWER(TRIM(Region)) IN ('akdeniz','mediterranean') THEN 'Mediterranean'
+     WHEN LOWER(TRIM(Region)) IN ('karadeniz','black sea') THEN 'Black Sea'
+     WHEN LOWER(TRIM(Region)) IN ('marmara') THEN 'Marmara'
+     WHEN LOWER(TRIM(Region)) IN ('central anatolia') THEN 'Central Anatolia'
+     ELSE NULLIF(TRIM(Region),'') END AS Region
+ FROM stores
+),
+dedup AS (
+ SELECT *, ROW_NUMBER() OVER (PARTITION BY Store_ID ORDER BY Store_Name, City) AS rn
+ FROM normalized WHERE Store_ID IS NOT NULL
+)
+SELECT Store_ID, Store_Name, City, Region FROM dedup WHERE rn = 1;
+
+sales data cleanıng process
+-----------------------------------------------------------------------------------------------------------
+CREATE TABLE sales_clean AS
+WITH normalized AS (
+ SELECT
+   NULLIF(UPPER(TRIM(Transaction_ID)), '') AS Transaction_ID,
+   Order_Date,
+   NULLIF(UPPER(TRIM(Customer_ID)), '') AS Customer_ID,
+   NULLIF(UPPER(TRIM(Product_ID)), '') AS Product_ID,
+   CASE
+     WHEN LOWER(TRIM(Quantity)) IN ('one','1 unit','1 pcs','1 pc') THEN 1
+     WHEN LOWER(TRIM(Quantity)) IN ('two','2 units','2 pcs','2 pc') THEN 2
+     WHEN LOWER(TRIM(Quantity)) IN ('three','3 units','3 pcs','3 pc') THEN 3
+     WHEN LOWER(TRIM(Quantity)) IN ('four','4 units','4 pcs','4 pc') THEN 4
+     WHEN LOWER(TRIM(Quantity)) IN ('five','5 units','5 pcs','5 pc') THEN 5
+     WHEN TRIM(Quantity) REGEXP '^-?[0-9]+([.][0-9]+)?$' THEN CAST(TRIM(Quantity) AS DECIMAL(12,2))
+     WHEN LOWER(TRIM(Quantity)) REGEXP '^-?[0-9]+( unit| units| pcs| pc)$'
+       THEN CAST(REGEXP_SUBSTR(TRIM(Quantity), '^-?[0-9]+') AS DECIMAL(12,2))
+     ELSE NULL END AS Quantity,
+   CASE
+     WHEN REPLACE(REPLACE(REPLACE(TRIM(Unit_Price),'$',''),',','.'),' ','') REGEXP '^-?[0-9]+([.][0-9]+)?$'
+       THEN CAST(REPLACE(REPLACE(REPLACE(TRIM(Unit_Price),'$',''),',','.'),' ','') AS DECIMAL(12,2))
+     ELSE NULL END AS Unit_Price,
+   CASE
+     WHEN TRIM(Discount) REGEXP '^[0-9]+([.][0-9]+)?%$'
+       THEN CAST(REPLACE(TRIM(Discount),'%','') AS DECIMAL(8,4)) / 100
+     WHEN TRIM(Discount) REGEXP '^[0-9]+([.][0-9]+)?$'
+       THEN CASE WHEN CAST(TRIM(Discount) AS DECIMAL(8,4)) BETWEEN 0 AND 1
+                 THEN CAST(TRIM(Discount) AS DECIMAL(8,4))
+                 WHEN CAST(TRIM(Discount) AS DECIMAL(8,4)) BETWEEN 1 AND 100
+                 THEN CAST(TRIM(Discount) AS DECIMAL(8,4)) / 100
+                 ELSE NULL END
+     ELSE NULL END AS Discount,
+   CASE
+     WHEN UPPER(REPLACE(REPLACE(REPLACE(TRIM(Store_ID),'-',''),' ',''),'_','')) REGEXP '^ST[0-9]{1,2}$'
+       THEN CONCAT('ST', LPAD(SUBSTRING(UPPER(REPLACE(REPLACE(REPLACE(TRIM(Store_ID),'-',''),' ',''),'_','')),3),2,'0'))
+     WHEN UPPER(REPLACE(REPLACE(TRIM(Store_ID),' ',''),'_','')) REGEXP '^STORE[0-9]{1,2}$'
+       THEN CONCAT('ST', LPAD(SUBSTRING(UPPER(REPLACE(REPLACE(TRIM(Store_ID),' ',''),'_','')),6),2,'0'))
+     ELSE NULLIF(UPPER(TRIM(Store_ID)),'') END AS Store_ID,
+   CASE
+     WHEN LOWER(REPLACE(TRIM(Payment_Method),' ','')) IN ('creditcard') THEN 'Credit Card'
+     WHEN LOWER(REPLACE(TRIM(Payment_Method),' ','')) IN ('debitcard','debit') THEN 'Debit Card'
+     WHEN LOWER(TRIM(Payment_Method))='cash' THEN 'Cash'
+     WHEN LOWER(REPLACE(TRIM(Payment_Method),' ','')) IN ('banktransfer') THEN 'Bank Transfer'
+     WHEN LOWER(REPLACE(TRIM(Payment_Method),' ','')) IN ('mobilepayment') THEN 'Mobile Payment'
+     ELSE NULLIF(TRIM(Payment_Method),'') END AS Payment_Method,
+   Order_Date AS raw_order_date
+ FROM sales
+),
+deduplicated AS (
+ SELECT *, ROW_NUMBER() OVER (
+   PARTITION BY Transaction_ID, raw_order_date, Customer_ID, Product_ID, Quantity,
+                Unit_Price, Discount, Store_ID, Payment_Method
+   ORDER BY Transaction_ID
+ ) AS duplicate_rank
+ FROM normalized
+ WHERE Transaction_ID IS NOT NULL
+)
+SELECT
+ Transaction_ID, Order_Date, Customer_ID, Product_ID, Quantity,
+ CASE WHEN Unit_Price < 0 THEN NULL ELSE Unit_Price END AS Unit_Price,
+ CASE WHEN Discount BETWEEN 0 AND 1 THEN Discount ELSE NULL END AS Discount,
+ Store_ID, Payment_Method
+FROM deduplicated
+WHERE duplicate_rank = 1;
+
+Prooduct data cleanıng process
+-----------------------------------------------------------------------------------------------------------
+CREATE TABLE products_clean AS
+WITH normalized AS (
+ SELECT
+   NULLIF(UPPER(TRIM(Product_ID)), '') AS Product_ID,
+   NULLIF(TRIM(Product_Name), '') AS Product_Name,
+   CASE
+     WHEN LOWER(REPLACE(TRIM(Category),' ','')) IN ('laptop','laptops') THEN 'Laptops'
+     WHEN LOWER(REPLACE(TRIM(Category),' ','')) IN ('smartphones','smartphone','smartphones','phones') THEN 'Smartphones'
+     WHEN LOWER(TRIM(Category)) IN ('','-','n/a','null') THEN NULL
+     WHEN LOWER(REPLACE(TRIM(Category),' ','')) IN ('audio') THEN 'Audio'
+     WHEN LOWER(REPLACE(TRIM(Category),' ','')) IN ('accessories') THEN 'Accessories'
+     WHEN LOWER(REPLACE(TRIM(Category),' ','')) IN ('monitors','monitor') THEN 'Monitors'
+     WHEN LOWER(REPLACE(TRIM(Category),' ','')) IN ('smart-home','smarthome') THEN 'Smart Home'
+     ELSE NULLIF(TRIM(Category),'') END AS Category,
+   CASE WHEN REPLACE(REPLACE(REPLACE(TRIM(Unit_Cost),'$',''),',','.'),' ','') REGEXP '^-?[0-9]+([.][0-9]+)?$'
+        THEN CAST(REPLACE(REPLACE(REPLACE(TRIM(Unit_Cost),'$',''),',','.'),' ','') AS DECIMAL(12,2))
+        ELSE NULL END AS Unit_Cost,
+   NULLIF(UPPER(TRIM(Supplier_ID)), '') AS Supplier_ID
+ FROM products
+),
+cost_check AS (
+ SELECT Product_ID,
+        COUNT(DISTINCT Unit_Cost) AS distinct_nonnull_costs,
+        SUM(Unit_Cost IS NULL) AS null_cost_rows
+ FROM normalized
+ WHERE Product_ID IS NOT NULL
+ GROUP BY Product_ID
+),
+dedup AS (
+ SELECT n.*,
+        ROW_NUMBER() OVER (PARTITION BY n.Product_ID ORDER BY n.Product_Name) AS rn
+ FROM normalized n
+ WHERE n.Product_ID IS NOT NULL
+)
+SELECT d.Product_ID, d.Product_Name, d.Category,
+       CASE WHEN c.distinct_nonnull_costs > 1 THEN NULL
+            WHEN d.Unit_Cost <= 0 THEN NULL ELSE d.Unit_Cost END AS Unit_Cost,
+       d.Supplier_ID
+FROM dedup d
+JOIN cost_check c ON d.Product_ID = c.Product_ID
+WHERE d.rn = 1;
