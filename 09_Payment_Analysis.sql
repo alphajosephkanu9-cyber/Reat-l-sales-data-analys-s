@@ -1,4 +1,3 @@
--- Payment method is available. Sales channel is not present in the source schema.
 SELECT Payment_Method, COUNT(DISTINCT Transaction_ID) AS transactions,
        SUM(Quantity*Unit_Price) AS line_value_before_discount,
        SUM(Quantity*Unit_Price)/NULLIF(COUNT(DISTINCT Transaction_ID),0) AS average_transaction_value
