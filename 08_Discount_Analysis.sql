@@ -1,4 +1,3 @@
--- Confirm with the data owner whether Unit_Price is before or after discount.
 SELECT Discount, COUNT(*) AS sales_lines, SUM(Quantity) AS net_units,
        SUM(Quantity*Unit_Price) AS line_value_before_discount
 FROM sales_clean
