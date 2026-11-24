@@ -1,4 +1,5 @@
--- Customer-level purchasing behavior
+Customer-level purchasing behavior
+ ------------------------------------------------------------------------------------------------------
 WITH customer_activity AS (
  SELECT Customer_ID, COUNT(DISTINCT Transaction_ID) AS transactions,
         SUM(Quantity) AS net_units, SUM(Quantity*Unit_Price) AS line_value
@@ -12,7 +13,8 @@ SELECT COUNT(*) AS purchasing_customers,
        SUM(line_value)/NULLIF(COUNT(*),0) AS revenue_per_customer
 FROM customer_activity;
 
--- Top customers and purchasing frequency (separate CTE because CTE scope is one statement)
+Top customers and purchasing frequency 
+  ------------------------------------------------------------------------------------------------------
 WITH customer_activity AS (
  SELECT Customer_ID, COUNT(DISTINCT Transaction_ID) AS transactions,
         SUM(Quantity) AS net_units, SUM(Quantity*Unit_Price) AS line_value
