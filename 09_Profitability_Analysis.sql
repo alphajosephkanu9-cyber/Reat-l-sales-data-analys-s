@@ -1,5 +1,3 @@
--- Estimated gross profit assumes Unit_Price is the realized unit selling price.
--- If Unit_Price is pre-discount, apply Discount ONCE after business-rule confirmation.
 SELECT
  SUM(s.Quantity*s.Unit_Price) AS line_value,
  SUM(s.Quantity*p.Unit_Cost) AS estimated_cost,
