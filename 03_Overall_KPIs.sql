@@ -1,4 +1,3 @@
--- Run only after reviewing cleaning validation.
 SELECT
  COUNT(*) AS sales_lines,
  COUNT(DISTINCT Transaction_ID) AS distinct_transactions,
